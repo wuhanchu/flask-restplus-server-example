@@ -45,11 +45,9 @@ class BaseConfig(object):
 
     ENABLED_MODULES = (
         'auth',
-
         'users',
-        'teams',
-        'evidences',
-
+        # 'teams',
+        # 'evidences',
         'api',
     )
 
@@ -72,6 +70,9 @@ class ProductionConfig(BaseConfig):
 
 class DevelopmentConfig(BaseConfig):
     DEBUG = True
+    TESTING = True
+    SECRET_KEY = 'this-really-needs-to-be-changed'
+    SQLALCHEMY_DATABASE_URI = os.getenv('CLOUDSML_API_SERVER_SQLALCHEMY_DATABASE_URI')
 
 
 class TestingConfig(BaseConfig):
