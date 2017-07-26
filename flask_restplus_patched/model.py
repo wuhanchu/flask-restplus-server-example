@@ -21,6 +21,9 @@ if flask_marshmallow.has_sqla:
     class ModelSchema(SchemaMixin, flask_marshmallow.sqla.ModelSchema):
         pass
 
+class QueryResult(Schema):
+    data = flask_marshmallow.base_fields.List( flask_marshmallow.base_fields.Dict)
+    total = flask_marshmallow.base_fields.Int()
 
 class DefaultHTTPErrorSchema(Schema):
     status = flask_marshmallow.base_fields.Integer()

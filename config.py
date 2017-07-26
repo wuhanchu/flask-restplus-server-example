@@ -42,12 +42,12 @@ class BaseConfig(object):
         #    'authorizationUrl': '/auth/oauth2/authorize',
         #},
     }
-
+    
+    # api 必须是最后一个模块
     ENABLED_MODULES = (
         'auth',
         'users',
-        # 'teams',
-        # 'evidences',
+        'teams',
         'api',
     )
 
