@@ -8,6 +8,10 @@ COPY "./config.py" "./"
 COPY "./tasks" "./tasks"
 
 RUN apk add --no-cache --virtual=.build_dependencies musl-dev gcc python3-dev libffi-dev && \
+    # 调整时区
+    apk --no-cache add tzdata  && \
+    ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime  && \
+    echo "Asia/Shanghai" > /etc/timezone && \
     cd /opt/www && \
     pip install -r tasks/requirements.txt && \
     invoke app.dependencies.install && \

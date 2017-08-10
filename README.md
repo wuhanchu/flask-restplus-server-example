@@ -16,3 +16,7 @@ invoke app.db.init_development_data
 
 #### migrate the database and install dependency , start server
 invoke app.run
+
+### question
+sqlalchemy_utils.types.password.PasswordType 的参数没有length需要使用max_length，自动生成的代码 需要人工修改。
+否则会发生
