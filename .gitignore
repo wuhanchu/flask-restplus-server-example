@@ -53,3 +53,7 @@ example.db
 .idea/
 clients/*/swagger.json
 clients/*/dist
+
+# ide conf
+.vscode
+.idea
