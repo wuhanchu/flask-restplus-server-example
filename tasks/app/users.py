@@ -34,8 +34,9 @@ def create_user(
     )
 
     from app.extensions import db
-    db.session.add(new_user)
-    db.session.commit()
+    with db.session.begin():
+        db.session.add(new_user)
+
 
 
 @app_context_task
@@ -52,21 +53,21 @@ def create_oauth2_client(
     from app.modules.users.models import User
     from app.modules.auth.models import OAuth2Client
 
-    user = User.query.first(User.username == username)
+    user = User.query.filter(User.username == username).first()
     if not user:
         raise Exception("User with username '%s' does not exist." % username)
 
     if default_scopes is None:
         from app.extensions.api import api_v1
-        default_scopes = ' '.join(api_v1.authorizations['oauth2_password']['scopes'])
+        default_scopes = list(api_v1.authorizations['oauth2_password']['scopes'].keys())
 
     oauth2_client = OAuth2Client(
         client_id=client_id,
         client_secret=client_secret,
         user=user,
-        _default_scopes=default_scopes
+        default_scopes=default_scopes
     )
 
     from app.extensions import db
-    db.session.add(oauth2_client)
-    db.session.commit()
+    with db.session.begin():
+        db.session.add(oauth2_client)

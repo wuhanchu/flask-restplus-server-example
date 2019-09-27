@@ -1,5 +1,5 @@
 # encoding: utf-8
-# pylint: disable=too-few-public-methods,invalid-name,bad-continuation
+# pylint: disable=too-few-public-methods
 """
 RESTful API User resources
 --------------------------
@@ -9,10 +9,9 @@ import logging
 
 from flask_login import current_user
 from flask_restplus_patched import Resource
-from flask_restplus_patched._http import HTTPStatus
+from flask_restplus._http import HTTPStatus
 
 from app.extensions.api import Namespace
-from app.extensions.api.parameters import PaginationParameters
 
 from . import permissions, schemas, parameters
 from .models import db, User
@@ -30,8 +29,8 @@ class Users(Resource):
 
     @api.login_required(oauth_scopes=['users:read'])
     @api.permission_required(permissions.AdminRolePermission())
-    @api.parameters(PaginationParameters())
     @api.response(schemas.BaseUserSchema(many=True))
+    @api.paginate()
     def get(self, args):
         """
         List of users.
@@ -59,8 +58,11 @@ class Users(Resource):
         return new_user
 
 
-@api.route('/signup_form')
+@api.route('/signup-form')
 class UserSignupForm(Resource):
+    """
+    Use signup form helpers.
+    """
 
     @api.response(schemas.UserSignupFormSchema())
     def get(self):

@@ -1,8 +1,6 @@
 language: python
 python:
   - "2.7"
-  - "3.3"
-  - "3.4"
   - "3.5"
   - "3.6"
   - "nightly"
@@ -46,6 +44,6 @@ script:
   py.test --cov=app
 
 after_success:
-  - pylint app
+  - pylint --disable=fixme app
   - coveralls
   - coverage xml && python-codacy-coverage -r coverage.xml

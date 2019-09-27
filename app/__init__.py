@@ -2,11 +2,11 @@
 """
 Example RESTful API Server.
 """
-import logging
 import os
 import sys
 
 from flask import Flask
+from werkzeug.contrib.fixers import ProxyFix
 
 
 CONFIG_NAME_MAPPER = {
@@ -20,6 +20,11 @@ def create_app(flask_config_name=None, **kwargs):
     """
     Entry point to the Flask RESTful Server application.
     """
+    # This is a workaround for Alpine Linux (musl libc) quirk:
+    # https://github.com/docker-library/python/issues/211
+    import threading
+    threading.stack_size(2*1024*1024)
+
     app = Flask(__name__, **kwargs)
 
     env_flask_config_name = os.getenv('FLASK_CONFIG')
@@ -41,7 +46,7 @@ def create_app(flask_config_name=None, **kwargs):
         app.config.from_object(CONFIG_NAME_MAPPER[flask_config_name])
     except ImportError:
         if flask_config_name == 'local':
-            app.logger.error(
+            app.logger.error(  # pylint: disable=no-member
                 "You have to have `local_config.py` or `local_config/__init__.py` in order to use "
                 "the default 'local' Flask Config. Alternatively, you may set `FLASK_CONFIG` "
                 "environment variable to one of the following options: development, production, "
@@ -50,9 +55,8 @@ def create_app(flask_config_name=None, **kwargs):
             sys.exit(1)
         raise
 
-    if app.debug:
-        logging.getLogger('flask_oauthlib').setLevel(logging.DEBUG)
-        app.logger.setLevel(logging.DEBUG)
+    if app.config['REVERSE_PROXY_SETUP']:
+        app.wsgi_app = ProxyFix(app.wsgi_app)
 
     from . import extensions
     extensions.init_app(app)

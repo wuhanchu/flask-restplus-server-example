@@ -5,16 +5,19 @@ Extended Api Namespace implementation with an application-specific helpers
 """
 from contextlib import contextmanager
 from functools import wraps
+import logging
 
 import flask_marshmallow
 import sqlalchemy
-from werkzeug.exceptions import HTTPException
 
-from flask_restplus_patched import Namespace as BaseNamespace
-from flask_restplus_patched._http import HTTPStatus
+from flask_restplus_patched.namespace import Namespace as BaseNamespace
+from flask_restplus._http import HTTPStatus
 
 from . import http_exceptions
 from .webargs_parser import CustomWebargsParser
+
+
+log = logging.getLogger(__name__)
 
 
 class Namespace(BaseNamespace):
@@ -24,7 +27,7 @@ class Namespace(BaseNamespace):
 
     WEBARGS_PARSER = CustomWebargsParser()
 
-    def resolve_object_by_model(self, model, object_arg_name, identity_arg_name=None):
+    def resolve_object_by_model(self, model, object_arg_name, identity_arg_names=None):
         """
         A helper decorator to resolve DB record instance by id.
 
@@ -32,8 +35,8 @@ class Namespace(BaseNamespace):
             model (type) - a Flask-SQLAlchemy model class with
                 ``query.get_or_404`` method
             object_arg_name (str) - argument name for a resolved object
-            identity_arg_name (str) - argument name holding an object identity,
-                by default it will be auto-generated as
+            identity_arg_names (tuple) - a list of argument names holding an
+                object identity, by default it will be auto-generated as
                 ``%(object_arg_name)s_id``.
 
         Example:
@@ -42,15 +45,26 @@ class Namespace(BaseNamespace):
         ...     return user
         >>> get_user_by_id(user_id=3)
         <User(id=3, ...)>
+
+        >>> @namespace.resolve_object_by_model(MyModel, 'my_model', ('user_id', 'model_name'))
+        ... def get_object_by_two_primary_keys(my_model):
+        ...     return my_model
+        >>> get_object_by_two_primary_keys(user_id=3, model_name="test")
+        <MyModel(user_id=3, name="test", ...)>
         """
-        if identity_arg_name is None:
-            identity_arg_name = '%s_id' % object_arg_name
+        if identity_arg_names is None:
+            identity_arg_names = ('%s_id' % object_arg_name, )
+        elif not isinstance(identity_arg_names, (list, tuple)):
+            identity_arg_names = (identity_arg_names, )
         return self.resolve_object(
             object_arg_name,
-            resolver=lambda kwargs: model.query.get_or_404(kwargs.pop(identity_arg_name))
+            resolver=lambda kwargs: model.query.get_or_404(
+                [kwargs.pop(identity_arg_name) for identity_arg_name in identity_arg_names]
+            )
         )
 
     def model(self, name=None, model=None, **kwargs):
+        # pylint: disable=arguments-differ
         """
         A decorator which registers a model (aka schema / definition).
 
@@ -64,7 +78,7 @@ class Namespace(BaseNamespace):
                 name = name[:-len('Schema')]
         return super(Namespace, self).model(name=name, model=model, **kwargs)
 
-    def login_required(self, oauth_scopes):
+    def login_required(self, oauth_scopes, locations=('headers',)):
         """
         A decorator which restricts access for authorized users only.
 
@@ -77,7 +91,9 @@ class Namespace(BaseNamespace):
           relevant options and in a text description.
 
         Arguments:
-            oauth_scopes (list) - a list of required OAuth2 Scopes (strings)
+            oauth_scopes (list): a list of required OAuth2 Scopes (strings)
+            locations (list): a list of locations (``headers``, ``form``) where
+                the access token should be looked up.
 
         Example:
         >>> class Users(Resource):
@@ -113,8 +129,7 @@ class Namespace(BaseNamespace):
                 # pylint: disable=protected-access
                 func_or_class._apply_decorator_to_methods(decorator)
                 return func_or_class
-            else:
-                func = func_or_class
+            func = func_or_class
 
             # Avoid circilar dependency
             from app.extensions import oauth2
@@ -138,14 +153,26 @@ class Namespace(BaseNamespace):
             else:
                 _oauth_scopes = oauth_scopes
 
-            oauth_protection_decorator = oauth2.require_oauth(*_oauth_scopes)
+            oauth_protection_decorator = oauth2.require_oauth(*_oauth_scopes, locations=locations)
             self._register_access_restriction_decorator(protected_func, oauth_protection_decorator)
             oauth_protected_func = oauth_protection_decorator(protected_func)
 
+            if 'form' in locations:
+                oauth_protected_func = self.param(
+                    name='access_token',
+                    description=(
+                        "This is an alternative way of passing the access_token, useful for "
+                        "making authenticated requests from the browser native forms."
+                    ),
+                    _in='formData',
+                    type='string',
+                    required=False
+                )(oauth_protected_func)
+
             return self.doc(
                 security={
-                    # This is a temporary configuration which is overriden in
-                    # `Api.add_namespace`.
+                    # This is a temporary (namespace) configuration which gets
+                    # overriden on a namespace registration (in `Api.add_namespace`).
                     '__oauth__': {
                         'type': 'oauth',
                         'scopes': _oauth_scopes,
@@ -258,6 +285,43 @@ class Namespace(BaseNamespace):
             func._access_restriction_decorators = []  # pylint: disable=protected-access
         func._access_restriction_decorators.append(decorator_to_register)  # pylint: disable=protected-access
 
+    def paginate(self, parameters=None, locations=None):
+        """
+        Endpoint parameters registration decorator special for pagination.
+        If ``parameters`` is not provided default PaginationParameters will be
+        used.
+
+        Also, any custom Parameters can be used, but it needs to have ``limit`` and ``offset``
+        fields.
+        """
+        if not parameters:
+            # Use default parameters if None specified
+            from app.extensions.api.parameters import PaginationParameters
+            parameters = PaginationParameters()
+
+        if not all(
+            mandatory in parameters.declared_fields
+            for mandatory in ('limit', 'offset')
+        ):
+            raise AttributeError(
+                '`limit` and `offset` fields must be in Parameter passed to `paginate()`'
+            )
+
+        def decorator(func):
+            @wraps(func)
+            def wrapper(self_, parameters_args, *args, **kwargs):
+                queryset = func(self_, parameters_args, *args, **kwargs)
+                total_count = queryset.count()
+                return (
+                    queryset
+                        .offset(parameters_args['offset'])
+                        .limit(parameters_args['limit']),
+                    HTTPStatus.OK,
+                    {'X-Total-Count': total_count}
+                )
+            return self.parameters(parameters, locations)(wrapper)
+        return decorator
+
     @contextmanager
     def commit_or_abort(self, session, default_error_message="The operation failed to complete"):
         """
@@ -277,8 +341,10 @@ class Namespace(BaseNamespace):
             with session.begin():
                 yield
         except ValueError as exception:
+            log.info("Database transaction was rolled back due to: %r", exception)
             http_exceptions.abort(code=HTTPStatus.CONFLICT, message=str(exception))
-        except sqlalchemy.exc.IntegrityError:
+        except sqlalchemy.exc.IntegrityError as exception:
+            log.info("Database transaction was rolled back due to: %r", exception)
             http_exceptions.abort(
                 code=HTTPStatus.CONFLICT,
                 message=default_error_message

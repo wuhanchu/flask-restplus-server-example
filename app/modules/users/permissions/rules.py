@@ -5,7 +5,7 @@ RESTful API Rules
 -----------------------
 """
 from flask_login import current_user
-from flask_restplus_patched._http import HTTPStatus
+from flask_restplus._http import HTTPStatus
 from permission import Rule as BaseRule
 
 from app.extensions.api import abort
@@ -45,6 +45,7 @@ class Rule(BaseRule):
                 if base_class in {Rule, BaseRule}:
                     continue
                 return base_class()
+        return None
 
 
 class AllowAllRule(Rule):

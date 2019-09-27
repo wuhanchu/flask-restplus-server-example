@@ -7,14 +7,24 @@ COPY "./app/requirements.txt" "./app/"
 COPY "./config.py" "./"
 COPY "./tasks" "./tasks"
 
-RUN apk add --no-cache --virtual=.build_dependencies musl-dev gcc python3-dev libffi-dev && \
+ARG INCLUDE_POSTGRESQL=false
+ARG INCLUDE_UWSGI=false
+RUN apk add --no-cache --virtual=.build_dependencies musl-dev gcc python3-dev libffi-dev linux-headers && \
+    cd /opt/www && \
+    pip install -r tasks/requirements.txt && \
+    invoke app.dependencies.install && \
+    ( \
+        if [ "$INCLUDE_POSTGRESQL" = 'true' ]; then \
+            apk add --no-cache libpq && \
+            apk add --no-cache --virtual=.build_dependencies postgresql-dev && \
+            pip install psycopg2 ; \
+        fi \
+    ) && \
+    ( if [ "$INCLUDE_UWSGI" = 'true' ]; then pip install uwsgi ; fi ) && \
     # 调整时区
     apk --no-cache add tzdata  && \
     ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime  && \
     echo "Asia/Shanghai" > /etc/timezone && \
-    cd /opt/www && \
-    pip install -r tasks/requirements.txt && \
-    invoke app.dependencies.install && \
     rm -rf ~/.cache/pip && \
     apk del .build_dependencies
 

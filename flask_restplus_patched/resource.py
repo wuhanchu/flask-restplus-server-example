@@ -2,18 +2,14 @@
 # pylint: disable=protected-access
 import flask
 from flask_restplus import Resource as OriginalResource
+from flask_restplus._http import HTTPStatus
 from werkzeug.exceptions import HTTPException
-
-from ._http import HTTPStatus
 
 
 class Resource(OriginalResource):
     """
     Extended Flast-RESTPlus Resource to add options method
     """
-
-    def __init__(self, *args, **kwargs):
-        super(Resource, self).__init__(*args, **kwargs)
 
     @classmethod
     def _apply_decorator_to_methods(cls, decorator):
