@@ -22,7 +22,8 @@ class BaseConfig(object):
     # )
 
     # SQLITE
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///%s' % (os.path.join(PROJECT_ROOT, "example.db"))
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///%s' % (
+        os.path.join(PROJECT_ROOT, "example.db"))
 
     DEBUG = False
     ERROR_404_HELP = False
@@ -37,14 +38,14 @@ class BaseConfig(object):
             'tokenUrl': '/auth/oauth2/token',
         },
         # TODO: implement other grant types for third-party apps
-        #'oauth2_implicit': {
+        # 'oauth2_implicit': {
         #    'type': 'oauth2',
         #    'flow': 'implicit',
         #    'scopes': {},
         #    'authorizationUrl': '/auth/oauth2/authorize',
-        #},
+        # },
     }
-    
+
     # api 必须是最后一个模块
     ENABLED_MODULES = (
         'auth',
@@ -67,14 +68,16 @@ class BaseConfig(object):
 
 class ProductionConfig(BaseConfig):
     SECRET_KEY = os.getenv('EXAMPLE_API_SERVER_SECRET_KEY')
-    SQLALCHEMY_DATABASE_URI = os.getenv('EXAMPLE_API_SERVER_SQLALCHEMY_DATABASE_URI')
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        'EXAMPLE_API_SERVER_SQLALCHEMY_DATABASE_URI')
 
 
 class DevelopmentConfig(BaseConfig):
     DEBUG = True
     TESTING = True
     SECRET_KEY = 'this-really-needs-to-be-changed'
-    SQLALCHEMY_DATABASE_URI = os.getenv('CLOUDSML_API_SERVER_SQLALCHEMY_DATABASE_URI')
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        'CLOUDSML_API_SERVER_SQLALCHEMY_DATABASE_URI', BaseConfig.SQLALCHEMY_DATABASE_URI)
 
 
 class TestingConfig(BaseConfig):
